@@ -140,6 +140,11 @@ if (fs.existsSync(iconSrc)) {
   fs.copyFileSync(iconSrc, path.resolve(assetsDir, 'icon-128.png'));
 }
 
+const repoUrl = pkg.homepage || (typeof pkg.repository === 'object' ? pkg.repository.url.replace(/^git\+/, '').replace(/\.git$/, '') : 'https://github.com/jay-sambhu/fake_filler');
+const privacyPolicyUrl = `${repoUrl}/blob/main/PRIVACY.md`;
+const supportEmail = (typeof pkg.author === 'object' ? pkg.author.email : '') || 'dellizulter@gmail.com';
+const supportWebsite = repoUrl;
+
 // 9. Write AMO_SUBMISSION_GUIDE.md
 const submissionGuide = `# Mozilla Firefox Add-ons (AMO) Submission Guide
 
@@ -165,9 +170,11 @@ Everything needed to submit **${firefoxManifest.name}** to Mozilla Add-ons (AMO)
 * **Description:**
   (Copy full description from CHROMEWEBSTORE.md)
 * **Privacy Policy URL:**
-  \`https://github.com/jay-sambhu/fake_filler/blob/main/PRIVACY.md\`
+  \`${privacyPolicyUrl}\`
 * **Support Email:**
-  \`dellizulter@gmail.com\`
+  \`${supportEmail}\`
+* **Support Website / Repository:**
+  \`${supportWebsite}\`
 
 ---
 

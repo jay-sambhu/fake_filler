@@ -42,10 +42,26 @@ jobs:
       - name: Build Production Extension
         run: npm run build
 
-      - name: Upload Extension Artifact
+      - name: Package Chrome Extension
+        if: matrix.node-version == '22.x'
+        run: npm run package
+
+      - name: Package Firefox Extension & Source
+        if: matrix.node-version == '22.x'
+        run: npm run package:firefox
+
+      - name: Upload Chrome Store Package
         if: matrix.node-version == '22.x'
         uses: actions/upload-artifact@v4
         with:
-          name: nepal-test-filler-dist
-          path: dist/
+          name: chrome-extension-package
+          path: nepal-test-filler-v*.zip
+          retention-days: 14
+
+      - name: Upload Firefox AMO Package
+        if: matrix.node-version == '22.x'
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-amo-package
+          path: firefox-upload/
           retention-days: 14

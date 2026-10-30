@@ -6,6 +6,8 @@ export default defineManifest(() => ({
   name: 'Nepal Test Filler',
   version: pkg.version,
   description: 'Fill web forms with realistic, synthetic Nepali test data: names, addresses, phone numbers, citizenship IDs and BS dates.',
+  homepage_url: pkg.homepage,
+  author: typeof pkg.author === 'object' && pkg.author?.email ? { email: pkg.author.email } : undefined,
   minimum_chrome_version: '116',
   browser_specific_settings: {
     gecko: {
