@@ -3,7 +3,6 @@ import { clearSnapshot, fillPage, fillPageAsync, matchesGenderText, revertForm }
 import { scanFormFields } from '../src/content/detector';
 import { matchDomainRule, FieldMappingRule } from '../src/services/domainMapping';
 import { generateSyntheticPerson } from '../src/generator/personGenerator';
-import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from '../src/services/geminiClassifier';
 import { FillOptions, SyntheticPerson } from '../src/types';
 
 const OPTIONS: FillOptions = {
@@ -162,8 +161,37 @@ describe('Fill regressions', () => {
     expect(matchDomainRule(input, rules)?.targetType).toBe('email');
   });
 
-  it('maps retired or unknown Gemini models to the default', () => {
-    expect(resolveGeminiModel('gemini-1.5-flash')).toBe(DEFAULT_GEMINI_MODEL);
-    expect(resolveGeminiModel(undefined)).toBe(DEFAULT_GEMINI_MODEL);
+  it('puts a plain number into number inputs (salary "45,000 NPR" was rejected)', () => {
+    document.body.innerHTML = `<label for="s">Gross Monthly Salary (NPR)</label><input type="number" id="s" name="salary">`;
+    fillPage({ ...generateSyntheticPerson('employee'), salary: '45,000 NPR' }, OPTIONS);
+    expect((document.getElementById('s') as HTMLInputElement).value).toBe('45000');
+  });
+
+  it('does not pick a placeholder option that shares a word with the value', () => {
+    document.body.innerHTML = `
+      <label for="f">Academic Faculty / Department</label>
+      <select id="f" name="faculty">
+        <option value="">-- Select Faculty --</option>
+        <option value="ioe">Institute of Engineering (IOE)</option>
+        <option value="iost">Institute of Science &amp; Technology (IoST)</option>
+        <option value="fom">Faculty of Management</option>
+      </select>`;
+    fillPage({ ...generateSyntheticPerson('general'), faculty: 'Faculty of Science & Technology' }, OPTIONS);
+    expect((document.getElementById('f') as HTMLSelectElement).value).toBe('iost');
+  });
+
+  it('gives email inputs an email even when autocomplete says username', () => {
+    document.body.innerHTML = `<label for="e">Email or phone</label><input type="email" id="e" name="identifier" autocomplete="username">`;
+    expect(scanFormFields(document)[0].type).toBe('email');
+  });
+
+  it('treats an "Email or phone" username field as email (Google sign-in)', () => {
+    document.body.innerHTML = `<label for="e">Email or phone</label><input type="text" id="e" name="identifier" autocomplete="username">`;
+    expect(scanFormFields(document)[0].type).toBe('email');
+  });
+
+  it.each(['जन्म स्थान', 'Place of Birth'])('detects "%s" as the birth district', (label) => {
+    document.body.innerHTML = `<label for="p">${label}</label><input type="text" id="p" name="pob">`;
+    expect(scanFormFields(document)[0].type).toBe('district');
   });
 });

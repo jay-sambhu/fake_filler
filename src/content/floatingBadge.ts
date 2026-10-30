@@ -85,6 +85,19 @@ async function getStoredOptions(): Promise<{ options: FillOptions; person: Synth
   return { options, person };
 }
 
+// Lucide icons (same set as the popup), inlined so the content script doesn't load React.
+const ICON_PATHS = {
+  zap: '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>',
+  pencilLine:
+    '<path d="M13 21h8"/><path d="m15 5 4 4"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/>',
+  rotateCcw: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+};
+
+function svgIcon(name: keyof typeof ICON_PATHS, size = 15): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+}
+
 function badgeIconHtml(): string {
   const url = typeof chrome !== 'undefined' && chrome.runtime?.getURL ? chrome.runtime.getURL('icons/icon-32.png') : '';
   return url ? `<img src="${url}" alt="" width="16" height="16" style="display:block;width:16px;height:16px">` : 'NP';
@@ -96,34 +109,50 @@ function injectStyles() {
   styleTag.id = STYLE_ID;
   styleTag.textContent = `
     #${BADGE_ID}, #${MENU_ID} { all: initial; box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    #${BADGE_ID} *, #${MENU_ID} * { all: unset; box-sizing: border-box; font-family: inherit; }
+    #${BADGE_ID} *:not(svg, svg *), #${MENU_ID} *:not(svg, svg *) { all: unset; box-sizing: border-box; font-family: inherit; }
+    #${BADGE_ID} svg, #${MENU_ID} svg {
+      display: block; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2;
+      stroke-linecap: round; stroke-linejoin: round; overflow: visible;
+    }
     #${BADGE_ID} {
       position: fixed; z-index: 2147483646; width: ${BADGE_SIZE}px; height: ${BADGE_SIZE}px;
       display: none; align-items: center; justify-content: center; cursor: pointer; user-select: none;
-      border-radius: 6px; background: #1c1917; color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
-      border: 1px solid rgba(217, 38, 68, 0.55); box-shadow: 0 2px 8px rgba(0,0,0,0.22);
-      opacity: 0.9; transition: transform .12s ease, opacity .12s ease, background-color .2s ease;
+      border-radius: 7px; color: #fff; font-size: 10px; font-weight: 700; line-height: 1;
+      background: rgba(28, 22, 30, 0.62); -webkit-backdrop-filter: blur(10px) saturate(160%); backdrop-filter: blur(10px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 14px rgba(0,0,0,0.25), 0 0 0 1px rgba(217,38,68,0.35);
+      opacity: 0.92; transition: transform .12s ease, opacity .12s ease, background-color .2s ease, box-shadow .2s ease;
     }
-    #${BADGE_ID}:hover { opacity: 1; transform: scale(1.08); border-color: #d92644; }
-    #${BADGE_ID}[data-state="done"] { background: #15803d; border-color: #15803d; }
+    #${BADGE_ID}:hover { opacity: 1; transform: scale(1.08); box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 18px rgba(217,38,68,0.4), 0 0 0 1px rgba(217,38,68,0.7); }
+    #${BADGE_ID}[data-state="done"] { background: rgba(22, 163, 74, 0.85); box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 14px rgba(22,163,74,0.4); }
     #${MENU_ID} {
       position: fixed; z-index: 2147483647; width: ${MENU_WIDTH}px; display: none; flex-direction: column;
-      padding: 4px; border-radius: 10px; background: #1c1917; color: #fafaf9; font-size: 12px;
-      border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+      padding: 5px; border-radius: 14px; color: #faf7fb; font-size: 12px;
+      background: linear-gradient(160deg, rgba(48, 30, 44, 0.78), rgba(22, 20, 34, 0.78));
+      -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 16px 40px rgba(0,0,0,0.38);
     }
     #${MENU_ID} .__nepal_menu_header {
-      display: flex; align-items: center; gap: 6px; padding: 6px 8px; margin-bottom: 2px;
-      font-size: 11px; font-weight: 600; color: #a8a29e; border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex; align-items: center; gap: 7px; padding: 6px 8px 8px; margin-bottom: 3px;
+      font-size: 11px; font-weight: 600; color: #b9aebb; border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     #${MENU_ID} .__nepal_menu_item {
-      display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 6px;
-      cursor: pointer; color: #fafaf9; text-align: left;
+      display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 9px;
+      cursor: pointer; color: #faf7fb; text-align: left; transition: background-color .12s ease;
     }
-    #${MENU_ID} .__nepal_menu_item:hover, #${MENU_ID} .__nepal_menu_item:focus-visible { background: rgba(217,38,68,0.2); }
-    #${MENU_ID} .__nepal_menu_icon { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+    #${MENU_ID} .__nepal_menu_item:hover, #${MENU_ID} .__nepal_menu_item:focus-visible { background: rgba(255,255,255,0.1); }
+    #${MENU_ID} .__nepal_menu_icon {
+      display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex-shrink: 0;
+      border-radius: 8px; color: #ff8095; background: rgba(240, 67, 95, 0.16);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    #${MENU_ID} .__nepal_menu_item:hover .__nepal_menu_icon {
+      color: #fff; background: linear-gradient(135deg, #f0435f, #c81e4a);
+    }
     #${MENU_ID} .__nepal_menu_text { display: flex; flex-direction: column; gap: 1px; line-height: 1.3; }
     #${MENU_ID} .__nepal_menu_text strong { font-size: 12px; font-weight: 600; }
-    #${MENU_ID} .__nepal_menu_text small { font-size: 10.5px; color: #a8a29e; }
+    #${MENU_ID} .__nepal_menu_text small { font-size: 10.5px; color: #b9aebb; }
   `;
   (document.head || document.documentElement).appendChild(styleTag);
 }
@@ -179,15 +208,15 @@ function createMenuElement(): HTMLElement {
   menu.innerHTML = `
     <div class="__nepal_menu_header">${badgeIconHtml()}<span>Nepal Test Filler</span></div>
     <button type="button" role="menuitem" class="__nepal_menu_item" data-action="fill-form">
-      <span class="__nepal_menu_icon">⚡</span>
+      <span class="__nepal_menu_icon">${svgIcon('zap')}</span>
       <span class="__nepal_menu_text"><strong>Fill entire form</strong><small>All detected fields</small></span>
     </button>
     <button type="button" role="menuitem" class="__nepal_menu_item" data-action="fill-field">
-      <span class="__nepal_menu_icon">✎</span>
+      <span class="__nepal_menu_icon">${svgIcon('pencilLine')}</span>
       <span class="__nepal_menu_text"><strong>Fill this field</strong><small>Only the selected input</small></span>
     </button>
     <button type="button" role="menuitem" class="__nepal_menu_item" data-action="revert-form">
-      <span class="__nepal_menu_icon">↺</span>
+      <span class="__nepal_menu_icon">${svgIcon('rotateCcw')}</span>
       <span class="__nepal_menu_text"><strong>Undo fill</strong><small>Restore previous values</small></span>
     </button>
   `;
@@ -248,7 +277,7 @@ function createMenuElement(): HTMLElement {
 function flashBadgeSuccess() {
   if (!badgeContainer) return;
   const icon = badgeContainer.querySelector('.__nepal_badge_icon');
-  if (icon) icon.textContent = '✓';
+  if (icon) icon.innerHTML = svgIcon('check', 13);
   badgeContainer.setAttribute('data-state', 'done');
 
   setTimeout(() => {

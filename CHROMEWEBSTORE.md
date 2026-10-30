@@ -37,7 +37,7 @@ How to use it:
 
 Save your own personas (for example "Pokhara student" or "Biratnagar merchant"), and add per-site rules when a field is not recognised automatically.
 
-Private by default: all data is generated on your device. An optional AI assist (your own Google Gemini API key) can classify fields the built-in rules don't recognise; it is off unless you turn it on.
+Private by default: all data is generated on your device. An optional AI assist (your own API key for Gemini, OpenAI, Claude, OpenRouter, Groq or a local model) can classify fields the built-in rules don't recognise; it is off unless you turn it on.
 
 All generated data is synthetic. Emails use reserved test domains that cannot receive mail. Use it only on forms you are allowed to test.
 
@@ -55,11 +55,11 @@ Fill web forms with synthetic Nepali test data for software development and QA t
 | `scripting` | Injects the form filler into tabs that were already open before the extension was installed or updated, so the user does not have to reload them. |
 | `contextMenus` | Adds "Fill form with Nepali test data" and "Undo fill" to the right-click menu. |
 
-**Remote code:** None. All code ships in the package. The optional AI assist sends a JSON request to the Google Gemini API and receives a field category name back; no code is downloaded.
+**Remote code:** None. All code ships in the package. The optional AI assist sends a JSON request to the AI provider the user selected and receives a field category name back; no code is downloaded.
 
 ## Privacy practices (Dashboard → Privacy tab)
 
-**Data collected:** Website content. This applies only when the user turns on AI assist and provides their own API key: for form fields the built-in rules cannot recognise, the field's name, id, placeholder, label text, input type and the site's hostname are sent to Google's Gemini API to classify the field. Values typed by the user and the generated test data are never sent.
+**Data collected:** Website content. This applies only when the user turns on AI assist and provides their own API key: for form fields the built-in rules cannot recognise, the field's name, id, placeholder, label text, input type and the site's hostname are sent to the AI provider the user selected (Google Gemini, OpenAI, Anthropic, OpenRouter, Groq, or a server the user enters) to classify the field. Values typed by the user and the generated test data are never sent.
 
 Certifications to tick:
 - I do not sell or transfer user data to third parties, outside of the approved use cases.

@@ -2,7 +2,7 @@
 
 A Chrome extension (Manifest V3) that fills web forms with realistic, synthetic Nepali test data: names in English or Devanagari, consistent province → district → municipality → ward addresses, NTC/Ncell mobile numbers, BS dates, citizenship/NID/PAN numbers, bank and wallet details.
 
-All data is generated locally. An optional AI assist can classify unrecognised fields with Google Gemini using the user's own API key.
+All data is generated locally. An optional AI assist can classify unrecognised fields with the user's choice of AI provider (Google Gemini, OpenAI, Anthropic, OpenRouter, Groq or any OpenAI-compatible server) and their own API key. The model list is loaded live from the provider.
 
 ## Development
 
@@ -21,7 +21,7 @@ npm run package    # fresh build + zip for the Chrome Web Store
 
 | Path | Role |
 | :--- | :--- |
-| `src/background/` | Service worker: keyboard shortcuts, context menu, Gemini calls (so the API key never enters a web page) |
+| `src/background/` | Service worker: keyboard shortcuts, context menu, AI provider calls (so the API key never enters a web page) |
 | `src/content/` | Runs in every frame: `detector.ts` classifies fields, `filler.ts` fills/undoes them, `floatingBadge.ts` is the in-page button |
 | `src/popup/`, `src/options/` | React UIs; shared design tokens in `src/styles/tokens.css` |
 | `src/generator/` | Person generator, Nepali calendar (AD ↔ BS), Devanagari, documents, banking |

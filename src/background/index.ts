@@ -1,5 +1,6 @@
 import { SyntheticPerson } from '../types';
-import { classifyUnknownField, resolveGeminiModel } from '../services/geminiClassifier';
+import { classifyUnknownField } from '../services/aiClassifier';
+import { loadAiConfig } from '../services/aiProviders';
 import {
   generatePersonForSettings,
   loadCurrentPerson,
@@ -105,16 +106,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   (async () => {
     try {
-      const store = (await chrome.storage.local.get([
-        'geminiApiKey',
-        'geminiAiClassificationEnabled',
-        'geminiModel',
-      ])) as Record<string, unknown>;
-      const result = await classifyUnknownField(message.payload, {
-        apiKey: String(store.geminiApiKey || ''),
-        enabled: store.geminiAiClassificationEnabled === true,
-        model: resolveGeminiModel(store.geminiModel as string | undefined),
-      });
+      const result = await classifyUnknownField(message.payload, await loadAiConfig());
       sendResponse({ status: 'ok', result });
     } catch (err) {
       sendResponse({ status: 'error', message: String(err) });

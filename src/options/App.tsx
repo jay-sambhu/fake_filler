@@ -60,12 +60,22 @@ import {
 } from '../services/domainMapping';
 import { getCacheStats, clearClassificationCache } from '../services/classificationCache';
 import {
-  testGeminiConnection,
-  GeminiConnectionTestResult,
-  SUPPORTED_GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL,
-  resolveGeminiModel,
-} from '../services/geminiClassifier';
+  AI_PROVIDERS,
+  AiConnectionTestResult,
+  AiModelOption,
+  StoredAiSettings,
+  DEFAULT_AI_PROVIDER,
+  DEFAULT_CUSTOM_BASE_URL,
+  describeAiError,
+  getProvider,
+  isAiConfigReady,
+  isAiProviderId,
+  listModels,
+  loadAiSettings,
+  testAiConnection,
+  toAiConfig,
+} from '../services/aiProviders';
+import { AiProviderId } from '../types';
 import {
   DEFAULT_FILL_CATEGORIES,
   FillCategories,
@@ -205,12 +215,23 @@ export function App() {
 
   // AI
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [ai, setAi] = useState<StoredAiSettings>({
+    enabled: false,
+    provider: DEFAULT_AI_PROVIDER,
+    apiKeys: {},
+    models: {},
+    customBaseUrl: DEFAULT_CUSTOM_BASE_URL,
+  });
   const [apiKey, setApiKey] = useState('');
-  const [savedApiKey, setSavedApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_CUSTOM_BASE_URL);
   const [showKey, setShowKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_GEMINI_MODEL);
+  const [models, setModels] = useState<AiModelOption[]>([]);
+  const [modelsState, setModelsState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle');
+  const [modelsError, setModelsError] = useState('');
+  const [manualModel, setManualModel] = useState(false);
+  const [modelDraft, setModelDraft] = useState('');
   const [cacheCount, setCacheCount] = useState(0);
-  const [testStatus, setTestStatus] = useState<GeminiConnectionTestResult | null>(null);
+  const [testStatus, setTestStatus] = useState<AiConnectionTestResult | null>(null);
   const [isTesting, setIsTesting] = useState(false);
 
   // Shortcuts
@@ -237,19 +258,14 @@ export function App() {
     setPreviewSource(PROFILES.find((p) => p.id === settings.profile)?.label || 'General citizen');
 
     if (hasStorage()) {
-      const data = (await chrome.storage.local.get([
-        'geminiApiKey',
-        'geminiModel',
-        'enableFloatingBadge',
-        'enableSessionPersistence',
-      ])) as Record<string, unknown>;
+      const data = (await chrome.storage.local.get(['enableFloatingBadge', 'enableSessionPersistence'])) as Record<string, unknown>;
       setEnableFloatingBadge(data.enableFloatingBadge !== false);
       setEnableSessionPersistence(data.enableSessionPersistence !== false);
-      const key = typeof data.geminiApiKey === 'string' ? data.geminiApiKey : '';
-      setApiKey(key);
-      setSavedApiKey(key);
-      setSelectedModel(resolveGeminiModel(data.geminiModel as string | undefined));
     }
+    const aiSettings = await loadAiSettings();
+    setAi(aiSettings);
+    setApiKey(aiSettings.apiKeys[aiSettings.provider] || '');
+    setBaseUrl(aiSettings.customBaseUrl);
   }, []);
 
   useEffect(() => {
@@ -393,42 +409,89 @@ export function App() {
 
   // ── AI ────────────────────────────────────────────────────
 
+  const provider = getProvider(ai.provider);
+  const savedApiKey = ai.apiKeys[ai.provider] || '';
+  const selectedModel = ai.models[ai.provider] || '';
+  const savedConfig = toAiConfig(ai);
+  const aiReady = isAiConfigReady(savedConfig);
+  const canListModels = provider.keyOptional || Boolean(savedApiKey);
+
+  const updateAi = async (next: StoredAiSettings, values: Record<string, unknown>, message?: string) => {
+    setAi(next);
+    setTestStatus(null);
+    if (message) await persist(values, message);
+    else await saveSettings(values);
+  };
+
   const handleAiToggle = async (enabled: boolean) => {
     setAiEnabled(enabled);
-    await persist({ geminiAiClassificationEnabled: enabled }, enabled ? 'AI assist turned on' : 'AI assist turned off');
+    await updateAi({ ...ai, enabled }, { geminiAiClassificationEnabled: enabled }, enabled ? 'AI assist turned on' : 'AI assist turned off');
+  };
+
+  const handleProviderChange = async (id: AiProviderId) => {
+    setApiKey(ai.apiKeys[id] || '');
+    setShowKey(false);
+    setManualModel(false);
+    await updateAi({ ...ai, provider: id }, { aiProvider: id }, `Provider set to ${getProvider(id).name}`);
   };
 
   const handleSaveKey = async () => {
     const key = apiKey.trim();
     setApiKey(key);
-    setSavedApiKey(key);
-    setTestStatus(null);
-    if (!key && aiEnabled) {
+    const apiKeys = { ...ai.apiKeys, [ai.provider]: key };
+    const next = { ...ai, apiKeys };
+    // Without a key the active provider can't run, so switch AI assist off rather than fail silently.
+    if (!key && !provider.keyOptional && ai.enabled) {
       setAiEnabled(false);
-      await persist({ geminiApiKey: '', geminiAiClassificationEnabled: false }, 'API key removed, AI assist turned off');
+      await updateAi({ ...next, enabled: false }, { aiApiKeys: apiKeys, geminiAiClassificationEnabled: false }, 'API key removed, AI assist turned off');
       return;
     }
-    await persist({ geminiApiKey: key }, key ? 'API key saved' : 'API key removed');
+    await updateAi(next, { aiApiKeys: apiKeys }, key ? 'API key saved' : 'API key removed');
+  };
+
+  const handleSaveBaseUrl = async () => {
+    const url = baseUrl.trim().replace(/\/+$/, '') || DEFAULT_CUSTOM_BASE_URL;
+    setBaseUrl(url);
+    if (url === ai.customBaseUrl) return;
+    await updateAi({ ...ai, customBaseUrl: url }, { aiCustomBaseUrl: url }, 'Server address saved');
   };
 
   const handleModelChange = async (model: string) => {
-    setSelectedModel(model);
-    setTestStatus(null);
-    await persist({ geminiModel: model }, 'Model updated');
+    const value = model.trim();
+    if (value === selectedModel) return;
+    const aiModels = { ...ai.models, [ai.provider]: value };
+    await updateAi({ ...ai, models: aiModels }, { aiModels }, value ? 'Model updated' : 'Model cleared');
   };
+
+  const fetchModels = useCallback(async (config: Pick<StoredAiSettings, 'provider'> & { apiKey: string; baseUrl: string }) => {
+    setModelsState('loading');
+    setModelsError('');
+    try {
+      const list = await listModels({ provider: config.provider, apiKey: config.apiKey, baseUrl: config.baseUrl });
+      setModels(list);
+      setModelsState('loaded');
+      if (list.length === 0) setModelsError('The provider returned no chat models for this key.');
+    } catch (err) {
+      setModels([]);
+      setModelsState('error');
+      setModelsError(describeAiError(err, getProvider(config.provider).name, '').message);
+    }
+  }, []);
+
+  // Load the model list whenever the AI tab shows a provider that has a saved key.
+  useEffect(() => {
+    if (activeTab !== 'ai') return;
+    setModels([]);
+    setModelsState('idle');
+    setModelsError('');
+    if (canListModels) fetchModels({ provider: ai.provider, apiKey: savedApiKey, baseUrl: ai.customBaseUrl });
+  }, [activeTab, ai.provider, savedApiKey, ai.customBaseUrl, canListModels, fetchModels]);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestStatus(null);
     try {
-      setTestStatus(await testGeminiConnection(apiKey, selectedModel));
-    } catch (err) {
-      setTestStatus({
-        success: false,
-        status: 'error',
-        message: `Connection test failed: ${err instanceof Error ? err.message : String(err)}`,
-        model: selectedModel,
-      });
+      setTestStatus(await testAiConnection({ ...savedConfig, apiKey: apiKey.trim() || savedApiKey }));
     } finally {
       setIsTesting(false);
     }
@@ -455,7 +518,9 @@ export function App() {
       enableFloatingBadge,
       enableSessionPersistence,
       aiEnabled,
-      geminiModel: selectedModel,
+      aiProvider: ai.provider,
+      aiModels: ai.models,
+      aiCustomBaseUrl: ai.customBaseUrl,
       domainMappings: allMappings,
       personaPresets: presets.filter((p) => !p.isBuiltin),
     };
@@ -489,7 +554,17 @@ export function App() {
         if (typeof parsed.enableFloatingBadge === 'boolean') values.enableFloatingBadge = parsed.enableFloatingBadge;
         if (typeof parsed.enableSessionPersistence === 'boolean') values.enableSessionPersistence = parsed.enableSessionPersistence;
         if (typeof parsed.aiEnabled === 'boolean') values.geminiAiClassificationEnabled = parsed.aiEnabled;
-        if (typeof parsed.geminiModel === 'string') values.geminiModel = resolveGeminiModel(parsed.geminiModel);
+        if (isAiProviderId(parsed.aiProvider)) values.aiProvider = parsed.aiProvider;
+        if (isPlainObject(parsed.aiModels)) {
+          values.aiModels = Object.fromEntries(
+            Object.entries(parsed.aiModels).filter(([id, model]) => isAiProviderId(id) && typeof model === 'string')
+          );
+        } else if (typeof parsed.geminiModel === 'string') {
+          values.aiModels = { gemini: parsed.geminiModel };
+        }
+        if (typeof parsed.aiCustomBaseUrl === 'string' && /^https?:\/\//.test(parsed.aiCustomBaseUrl)) {
+          values.aiCustomBaseUrl = parsed.aiCustomBaseUrl;
+        }
         if (parsed.theme === 'dark' || parsed.theme === 'light' || parsed.theme === 'system') {
           await handleThemeChange(parsed.theme);
         }
@@ -530,6 +605,8 @@ export function App() {
 
   const domainEntries = Object.entries(allMappings).filter(([, c]) => c.rules?.length);
   const keyDirty = apiKey.trim() !== savedApiKey;
+  const modelOptions = selectedModel && !models.some((m) => m.id === selectedModel) ? [{ id: selectedModel, name: selectedModel }, ...models] : models;
+  const showModelSelect = !manualModel && modelsState === 'loaded' && models.length > 0;
   const version = extensionVersion();
 
   return (
@@ -797,37 +874,78 @@ export function App() {
             <section>
               <h2>AI assist</h2>
               <p className="lead">
-                Optional. When the built-in rules can't recognise a field, Google Gemini can classify it. Everything else stays on your device.
+                Optional. When the built-in rules can't recognise a field, an AI model of your choice can classify it. Everything else stays on your device.
               </p>
 
               <div className="card list">
                 <div className="setting">
                   <label htmlFor="ai-toggle">
-                    <div className="setting-title">Classify unknown fields with Gemini</div>
-                    <div className="setting-desc">{savedApiKey ? 'Uses your API key below.' : 'Add an API key below to turn this on.'}</div>
+                    <div className="setting-title">Classify unknown fields with AI</div>
+                    <div className="setting-desc">
+                      {aiReady
+                        ? `Uses ${provider.name} · ${selectedModel}`
+                        : provider.keyOptional || savedApiKey
+                          ? 'Choose a model below to turn this on.'
+                          : `Add your ${provider.name} API key below to turn this on.`}
+                    </div>
                   </label>
                   <Switch
                     id="ai-toggle"
-                    label="Classify unknown fields with Gemini"
-                    checked={aiEnabled}
+                    label="Classify unknown fields with AI"
+                    checked={aiEnabled && aiReady}
                     onChange={handleAiToggle}
-                    disabled={!aiEnabled && !savedApiKey}
+                    disabled={!aiReady}
                   />
                 </div>
 
+                <div className="setting">
+                  <label htmlFor="ai-provider">
+                    <div className="setting-title">Provider</div>
+                    <div className="setting-desc">Each provider keeps its own key and model.</div>
+                  </label>
+                  <select id="ai-provider" className="select" value={ai.provider} onChange={(e) => handleProviderChange(e.target.value as AiProviderId)}>
+                    {AI_PROVIDERS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {provider.id === 'custom' && (
+                  <div className="setting column">
+                    <label htmlFor="ai-base-url" className="setting-title">Server address</label>
+                    <input
+                      id="ai-base-url"
+                      type="url"
+                      className="input mono"
+                      placeholder={DEFAULT_CUSTOM_BASE_URL}
+                      value={baseUrl}
+                      spellCheck={false}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      onBlur={handleSaveBaseUrl}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveBaseUrl()}
+                    />
+                    <div className="setting-desc">
+                      Any OpenAI-compatible API, such as Ollama, LM Studio, DeepSeek or Mistral. Include the version path, for example <code>/v1</code>.
+                    </div>
+                  </div>
+                )}
+
                 <div className="setting column">
-                  <label htmlFor="api-key" className="setting-title">Gemini API key</label>
+                  <label htmlFor="api-key" className="setting-title">
+                    API key{provider.keyOptional ? ' (optional)' : ''}
+                  </label>
                   <div className="row">
                     <div className="input-wrap grow">
                       <input
                         id="api-key"
                         type={showKey ? 'text' : 'password'}
                         className="input"
-                        placeholder="Paste your key from Google AI Studio"
+                        placeholder={provider.keyPlaceholder}
                         value={apiKey}
                         autoComplete="off"
                         spellCheck={false}
                         onChange={(e) => { setApiKey(e.target.value); setTestStatus(null); }}
+                        onKeyDown={(e) => e.key === 'Enter' && keyDirty && handleSaveKey()}
                       />
                       <button type="button" className="input-icon" onClick={() => setShowKey(!showKey)} aria-label={showKey ? 'Hide key' : 'Show key'}>
                         {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -836,33 +954,85 @@ export function App() {
                     <button type="button" className="btn primary" onClick={handleSaveKey} disabled={!keyDirty}>
                       Save
                     </button>
-                    <button type="button" className="btn secondary" onClick={handleTestConnection} disabled={isTesting || !apiKey.trim()}>
+                  </div>
+                  <div className="setting-desc">
+                    Stored only in this browser and sent only to {provider.name}.
+                    {provider.keyUrl && (
+                      <>
+                        {' '}Get a key at{' '}
+                        <a href={provider.keyUrl} target="_blank" rel="noreferrer">
+                          {new URL(provider.keyUrl).hostname} <ExternalLink size={11} />
+                        </a>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="setting column">
+                  <div className="row">
+                    <label htmlFor="ai-model" className="setting-title grow">Model</label>
+                    {canListModels && (
+                      <button
+                        type="button"
+                        className="btn ghost small"
+                        onClick={() => fetchModels({ provider: ai.provider, apiKey: savedApiKey, baseUrl: ai.customBaseUrl })}
+                        disabled={modelsState === 'loading'}
+                      >
+                        <RefreshCw size={13} className={modelsState === 'loading' ? 'spin' : ''} /> Refresh list
+                      </button>
+                    )}
+                    {modelsState === 'loaded' && models.length > 0 && (
+                      <button type="button" className="btn ghost small" onClick={() => { setManualModel(!manualModel); setModelDraft(selectedModel); }}>
+                        {manualModel ? 'Pick from list' : 'Type a model ID'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="row">
+                    {showModelSelect ? (
+                      <select id="ai-model" className="select wide" value={selectedModel} onChange={(e) => handleModelChange(e.target.value)}>
+                        <option value="" disabled>Choose a model ({models.length} available)</option>
+                        {modelOptions.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name === m.id ? m.id : `${m.name} (${m.id})`}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id="ai-model"
+                        className="input mono grow"
+                        placeholder={modelsState === 'loading' ? 'Loading models…' : 'Model ID'}
+                        value={manualModel ? modelDraft : selectedModel}
+                        disabled={!manualModel && modelsState === 'loading'}
+                        spellCheck={false}
+                        onFocus={() => { if (!manualModel) { setManualModel(true); setModelDraft(selectedModel); } }}
+                        onChange={(e) => setModelDraft(e.target.value)}
+                        onBlur={() => handleModelChange(modelDraft)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleModelChange(modelDraft)}
+                      />
+                    )}
+                    <button type="button" className="btn secondary" onClick={handleTestConnection} disabled={isTesting || !selectedModel || (!provider.keyOptional && !apiKey.trim() && !savedApiKey)}>
                       {isTesting ? <Loader2 size={14} className="spin" /> : null}
                       {isTesting ? 'Testing…' : 'Test'}
                     </button>
                   </div>
                   <div className="setting-desc">
-                    Stored only in this browser. Get a key at{' '}
-                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com <ExternalLink size={11} /></a>
+                    {!canListModels
+                      ? 'Save your API key to load the models it can use.'
+                      : modelsState === 'loading'
+                        ? `Loading models from ${provider.name}…`
+                        : 'The list comes live from the provider. A small, fast model is plenty for classifying fields.'}
                   </div>
+                  {modelsError && (
+                    <div className="notice error" role="status">
+                      <AlertCircle size={16} />
+                      <span>{modelsError} You can still type a model ID.</span>
+                    </div>
+                  )}
                   {testStatus && (
                     <div className={`notice ${testStatus.success ? 'success' : 'error'}`} role="status">
                       {testStatus.success ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
                       <span>{testStatus.message}</span>
                     </div>
                   )}
-                </div>
-
-                <div className="setting">
-                  <label htmlFor="model">
-                    <div className="setting-title">Model</div>
-                    <div className="setting-desc">Flash-Lite is fast and cheap, which suits field classification well.</div>
-                  </label>
-                  <select id="model" className="select" value={selectedModel} onChange={(e) => handleModelChange(e.target.value)}>
-                    {SUPPORTED_GEMINI_MODELS.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.description})</option>
-                    ))}
-                  </select>
                 </div>
 
                 <div className="setting">
@@ -879,8 +1049,8 @@ export function App() {
               <div className="notice info">
                 <AlertCircle size={16} />
                 <span>
-                  What is sent: the site's hostname and the unknown field's name, id, placeholder, label and input type. Never what you or the page typed, and
-                  never the generated test data.
+                  What is sent to {provider.name}: the site's hostname and the unknown field's name, id, placeholder, label and input type. Never what you or the
+                  page typed, and never the generated test data.
                 </span>
               </div>
             </section>

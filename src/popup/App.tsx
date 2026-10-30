@@ -50,6 +50,7 @@ import {
 } from '../services/settings';
 import { serializePersonaToJson, copyTextToClipboard } from '../utils/personaExport';
 import { sendToTab } from '../services/tabMessaging';
+import { getProvider, isAiConfigReady, loadAiConfig } from '../services/aiProviders';
 import { fieldTypeLabel, MAPPABLE_FIELD_TYPES } from '../utils/fieldTypeLabels';
 
 type Status = { type: 'success' | 'warning' | 'error'; message: string } | null;
@@ -102,6 +103,7 @@ export const App: React.FC = () => {
   const [categories, setCategories] = useState<FillCategories>(DEFAULT_FILL_CATEGORIES);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiReady, setAiReady] = useState(false);
+  const [aiProviderName, setAiProviderName] = useState('');
   const [presets, setPresets] = useState<PersonaPreset[]>([]);
   const [status, setStatus] = useState<Status>(null);
   const [isFilling, setIsFilling] = useState(false);
@@ -175,10 +177,9 @@ export const App: React.FC = () => {
       setScript(settings.fillScript);
       setCategories(settings.fillCategories);
       setAiEnabled(settings.aiEnabled);
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        const { geminiApiKey } = (await chrome.storage.local.get(['geminiApiKey'])) as Record<string, unknown>;
-        setAiReady(Boolean(geminiApiKey));
-      }
+      const aiConfig = await loadAiConfig();
+      setAiReady(isAiConfigReady(aiConfig));
+      setAiProviderName(getProvider(aiConfig.provider).name);
 
       if (tab?.id !== undefined) {
         setTabId(tab.id);
@@ -611,7 +612,7 @@ export const App: React.FC = () => {
       )}
 
       <footer className="footer">
-        <span className="footer-mode" title={aiEnabled && aiReady ? 'Unknown fields are classified with Gemini' : 'All data is generated on your device'}>
+        <span className="footer-mode" title={aiEnabled && aiReady ? `Unknown fields are classified with ${aiProviderName}` : 'All data is generated on your device'}>
           {aiEnabled && aiReady ? <Bot size={12} /> : <ShieldCheck size={12} />}
           {aiEnabled && aiReady ? 'AI assist on' : 'Offline'}
         </span>

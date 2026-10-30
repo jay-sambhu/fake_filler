@@ -452,6 +452,12 @@ const PATTERN_RULES: MatchRule[] = [
     baseConfidence: 0.95,
   },
   {
+    // Nepali forms (passport, citizenship) expect the birth district here.
+    type: 'district',
+    regex: /(?:\b(place\s*of\s*birth|birth\s*place|birthplace|pob|janma\s*sthan)\b|जन्म\s*स्थान|जन्मस्थान)/i,
+    baseConfidence: 0.96,
+  },
+  {
     type: 'district',
     regex: /(?:\b(district|jilla|zila)\b|जिल्ला)/i,
     baseConfidence: 0.95,
@@ -726,9 +732,18 @@ export function detectFieldType(element: HTMLElement): DetectedField {
   const effectiveLabel = `${label} ${groupLabel}`.trim();
   const script = detectTargetScript({ label: effectiveLabel, placeholder, title, name: name || '', id: id || '' });
 
+  // An email input only accepts an email, even when autocomplete says "username" (Google sign-in).
+  if (inputType === 'email') {
+    return { element, type: 'email', confidence: 0.98, label, name, id, script };
+  }
+
   // 1. Direct autocomplete signal (Highest precedence if matched)
   if (autocomplete && AUTOCOMPLETE_MAP[autocomplete]) {
     let matchedType = AUTOCOMPLETE_MAP[autocomplete];
+    // Sign-in forms mark "Email or phone" as autocomplete="username"; an email works there, a handle doesn't.
+    if (matchedType === 'username' && /\be-?mail\b|इमेल|ईमेल/i.test(`${effectiveLabel} ${placeholder}`)) {
+      matchedType = 'email';
+    }
     const rawSignals = `${effectiveLabel} ${name || ''} ${id || ''} ${placeholder} ${title}`;
     const addressScope = detectAddressScope(element, rawSignals);
     if (addressScope === 'temporary') {
@@ -756,9 +771,6 @@ export function detectFieldType(element: HTMLElement): DetectedField {
   // 2. Direct HTML5 input type shortcuts
   if (inputType === 'password') {
     return { element, type: 'password', confidence: 0.99, label, name, id, script };
-  }
-  if (inputType === 'email') {
-    return { element, type: 'email', confidence: 0.98, label, name, id, script };
   }
 
   // 3. Multi-Signal Scoring across weighted channels

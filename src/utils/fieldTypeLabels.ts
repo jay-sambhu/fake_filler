@@ -1,5 +1,5 @@
 import { SupportedFieldType } from '../types';
-import { VALID_FIELD_TYPES } from '../services/geminiClassifier';
+import { VALID_FIELD_TYPES } from '../services/aiClassifier';
 
 const LABELS: Partial<Record<SupportedFieldType, string>> = {
   fullName: 'Full name',

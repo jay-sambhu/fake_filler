@@ -12,12 +12,12 @@ Tick items off as they are done. Each item says why it matters, so it's clear wh
 - [x] **Privacy policy:** published at https://github.com/jay-sambhu/Chrome-extension/blob/main/PRIVACY.md (contact: dellizulter@gmail.com).
 - [x] **Driving licence Category K = `ट`:** confirmed by the transport office question bank ("वर्ग ट/K (स्कुटर/मोपेड)").
 - [ ] **Test by hand on real forms** with `dist/` loaded unpacked:
-  - [ ] Lok Sewa (psc.gov.np) online application
-  - [ ] A government KYC-style form (passport / nagarikta / DoTM)
-  - [ ] eSewa or Khalti sandbox checkout
+  - [ ] Lok Sewa online application (psconline.psc.gov.np). Not reachable from the test machine on 14 Oct (connection timed out); try from another network after logging in
+  - [x] Government forms: nepalpassport.gov.np status form (citizenship no, DOB, surname filled; "जन्म स्थान" now detected as birth district). NID pre-enrolment needs login, IRD PAN blocks automated browsers, eMRTDS and DoTM timed out
+  - [x] eSewa (rc-epay) and Khalti (test-admin) test login forms. A full sandbox checkout needs a merchant test account
   - [x] React apps: ant.design form demos (48 fields), MUI text fields (47), demoqa practice form (8), all without page errors. Fixed on the way: "standard" mis-detected as a grade, and Fill failing while heavy pages were still loading
-  - [ ] Google Forms
-  - [ ] `demo/index.html`, all six tabs, in English and नेपाली
+  - [ ] Google Forms. Every public form found needed sign-in or was closed. Create a test form with your account and try it (Google sign-in's "Email or phone" now gets an email)
+  - [x] `demo/index.html`, all six tabs, in English and नेपाली: no page errors. Fixed: number inputs rejected "45,000 NPR", and a select picked its "-- Select Faculty --" placeholder. Left empty on purpose: optional inclusion checkboxes and free-text remarks; there is no GPA field type yet
 - [ ] **Test on Windows.** Most users are on Windows; check that Devanagari renders in the popup and on pages.
 - [ ] **Test on macOS.** Check that Alt+Shift+F/R/U don't clash with typing special characters.
 - [ ] **Fill in the store dashboard** from `CHROMEWEBSTORE.md`: listing text, 5 screenshots, promo tile, permission justifications, Privacy tab answers.
@@ -52,7 +52,7 @@ Tick items off as they are done. Each item says why it matters, so it's clear wh
 - [ ] **Sample files for upload fields:** dummy citizenship and passport images and a PDF.
 - [ ] **Multi-step forms:** detect the next step automatically and fill it with the same person.
 - [ ] **Share site rules with a team** (import from a URL or file).
-- [ ] **AI assist:** classify all unknown fields in one Gemini request instead of one per field.
+- [ ] **AI assist:** classify all unknown fields in one AI request instead of one per field.
 
 ## 4. Later
 

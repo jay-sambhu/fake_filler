@@ -296,10 +296,16 @@ export interface FillResult {
   errors?: string[];
 }
 
-export interface GeminiConfig {
-  apiKey: string;
+export type AiProviderId = 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq' | 'custom';
+
+/** The AI provider used to classify fields the built-in rules can't recognise. */
+export interface AiConfig {
   enabled: boolean;
-  model?: string;
+  provider: AiProviderId;
+  apiKey: string;
+  model: string;
+  /** Only for the custom OpenAI-compatible provider. */
+  baseUrl?: string;
 }
 
 export interface FieldClassificationPayload {

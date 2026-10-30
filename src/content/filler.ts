@@ -7,7 +7,7 @@ import {
   FillResult,
   FillScript,
   FormSnapshot,
-  GeminiConfig,
+  AiConfig,
   PageFieldInspection,
   SupportedFieldType,
   SyntheticPerson,
@@ -399,12 +399,20 @@ function fillSelectElement(select: HTMLSelectElement, targetValue: string, altVa
     matchedOption = matchBloodGroupOption(options, targetValue, altValue);
   }
 
-  // 8. Partial word match with primary target
+  // 8. Partial word match with primary target: the real option sharing the most words.
+  //    Placeholders are skipped, otherwise "-- Select Faculty --" wins for "Faculty of Science".
   if (!matchedOption) {
-    matchedOption = options.find((opt) => {
+    const words = targetLower.split(/[^\p{L}\p{N}]+/u).filter((word) => word.length > 3);
+    let bestScore = 0;
+    for (const opt of options) {
+      if (opt.disabled || opt.value === '') continue;
       const optText = opt.text.toLowerCase();
-      return targetLower.split(' ').some((word) => word.length > 3 && optText.includes(word));
-    });
+      const score = words.filter((word) => optText.includes(word)).length;
+      if (score > bestScore) {
+        bestScore = score;
+        matchedOption = opt;
+      }
+    }
   }
 
   // 9. Still no match: pick the first real (non-placeholder, enabled) option
@@ -1015,7 +1023,12 @@ function fillFieldElement(
     if (primaryValue) {
       // Number, tel, email, date and url inputs reject Devanagari digits (the value silently becomes empty)
       const asciiOnly = /^(number|tel|email|date|datetime-local|month|url)$/.test(inputType);
-      const scriptSafe = asciiOnly ? toEnglishNumerals(primaryValue) : primaryValue;
+      let scriptSafe = asciiOnly ? toEnglishNumerals(primaryValue) : primaryValue;
+      // Number inputs drop anything that isn't a plain number, e.g. "45,000 NPR" or "3.6 GPA"
+      if (inputType === 'number') {
+        scriptSafe = scriptSafe.replace(/,/g, '').match(/-?\d+(\.\d+)?/)?.[0] || '';
+        if (!scriptSafe) return false;
+      }
       const maxLength = inputElem.maxLength;
       const value = maxLength > 0 && scriptSafe.length > maxLength ? scriptSafe.slice(0, maxLength) : scriptSafe;
       setNativeValue(inputElem, value);
@@ -1407,15 +1420,15 @@ const MAX_AI_CLASSIFICATIONS_PER_FILL = 25;
  * Asynchronous page filler that executes:
  * 1. Custom Domain Mapping Overrides (Highest priority)
  * 2. Local Heuristic Detection
- * 3. Optional Gemini AI classification for unhandled unknowns
+ * 3. Optional AI classification for unhandled unknowns
  *
  * `classify` lets the content script route classification through the background
- * service worker; when omitted, Gemini is called directly with `geminiConfig`.
+ * service worker; when omitted, the provider is called directly with `aiConfig`.
  */
 export async function fillPageAsync(
   person: SyntheticPerson,
   options: FillOptions,
-  geminiConfig?: GeminiConfig,
+  aiConfig?: AiConfig,
   root: Document | HTMLElement | ShadowRoot = document,
   domainRules: FieldMappingRule[] = [],
   classify?: FieldClassifier
@@ -1448,13 +1461,13 @@ export async function fillPageAsync(
     }
   }
 
-  // 3. Optional Gemini AI classification for remaining unhandled fields
+  // 3. Optional AI classification for remaining unhandled fields
   const classifier: FieldClassifier | undefined =
     classify ||
-    (geminiConfig?.enabled && geminiConfig.apiKey
+    (aiConfig?.enabled
       ? async (payload) => {
-          const { classifyUnknownField } = await import('../services/geminiClassifier');
-          return classifyUnknownField(payload, geminiConfig);
+          const { classifyUnknownField } = await import('../services/aiClassifier');
+          return classifyUnknownField(payload, aiConfig);
         }
       : undefined);
 

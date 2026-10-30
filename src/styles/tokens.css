@@ -1,32 +1,49 @@
-/* Shared design tokens for the popup and options pages. */
+/* Shared design tokens for the popup and options pages: a frosted-glass theme over a
+   crimson/blue mesh background (the colours of the Nepali flag). */
 :root {
   --crimson: #d92644;
   --crimson-strong: #b81734;
-  --crimson-soft: rgba(217, 38, 68, 0.1);
+  --crimson-soft: rgba(217, 38, 68, 0.12);
   --blue: #2f5fd0;
+  --accent-gradient: linear-gradient(135deg, #e3324f 0%, #c4173a 55%, #9c1d5c 100%);
+  --accent-glow: 0 6px 20px rgba(217, 38, 68, 0.32);
 
-  --bg: #faf7f3;
-  --surface: #ffffff;
-  --surface-2: #f4eee6;
-  --border: #e7dfd4;
-  --border-strong: #d6cabb;
-  --text: #241b14;
-  --text-2: #5f564f;
-  --text-3: #8a8079;
-  --focus: rgba(217, 38, 68, 0.35);
+  --bg: #f5eef2;
+  --bg-mesh:
+    radial-gradient(circle at 0% 0%, rgba(232, 54, 84, 0.3), transparent 48%),
+    radial-gradient(circle at 100% 8%, rgba(47, 95, 208, 0.26), transparent 50%),
+    radial-gradient(circle at 85% 100%, rgba(147, 76, 230, 0.2), transparent 52%),
+    radial-gradient(circle at 5% 95%, rgba(250, 140, 80, 0.18), transparent 50%),
+    linear-gradient(160deg, #fbf4f6 0%, #eef0fa 100%);
 
-  --success: #15803d;
-  --success-bg: #ecfdf3;
-  --warning: #b45309;
-  --warning-bg: #fff7e6;
+  /* Glass layers: translucent fills, a bright rim and an inner top highlight. */
+  --surface: rgba(255, 255, 255, 0.58);
+  --surface-2: rgba(255, 255, 255, 0.4);
+  --surface-hover: rgba(255, 255, 255, 0.78);
+  --surface-active: rgba(255, 255, 255, 0.92);
+  --surface-solid: #ffffff;
+  --border: rgba(255, 255, 255, 0.75);
+  --border-strong: rgba(90, 50, 70, 0.18);
+  --glass-blur: blur(18px) saturate(170%);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+
+  --text: #221a22;
+  --text-2: #554a54;
+  --text-3: #7a6e78;
+  --focus: rgba(217, 38, 68, 0.4);
+
+  --success: #12753a;
+  --success-bg: rgba(34, 197, 94, 0.14);
+  --warning: #a24a06;
+  --warning-bg: rgba(245, 158, 11, 0.16);
   --danger: #c81e3a;
-  --danger-bg: #fdecef;
+  --danger-bg: rgba(225, 29, 72, 0.12);
 
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-lg: 14px;
-  --shadow-sm: 0 1px 2px rgba(60, 35, 15, 0.06);
-  --shadow: 0 4px 14px rgba(60, 35, 15, 0.08);
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(70, 30, 50, 0.06), 0 2px 8px rgba(70, 30, 50, 0.05);
+  --shadow: 0 10px 32px rgba(70, 30, 50, 0.12);
 
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Noto Sans Devanagari', 'Mukta', sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
@@ -36,53 +53,77 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --crimson: #f0435f;
-    --crimson-strong: #ff6b81;
-    --crimson-soft: rgba(240, 67, 95, 0.16);
-    --blue: #6b93f0;
-    --bg: #171412;
-    --surface: #221e1b;
-    --surface-2: #2c2723;
-    --border: #3a332e;
-    --border-strong: #4d4540;
-    --text: #f6f3f0;
-    --text-2: #c4bbb3;
-    --text-3: #948a82;
-    --focus: rgba(240, 67, 95, 0.45);
+    --crimson: #ff5a74;
+    --crimson-strong: #ff8095;
+    --crimson-soft: rgba(255, 90, 116, 0.16);
+    --blue: #7aa0ff;
+    --accent-gradient: linear-gradient(135deg, #f0435f 0%, #c81e4a 55%, #8b2a8f 100%);
+    --accent-glow: 0 6px 22px rgba(240, 67, 95, 0.4);
+    --bg: #110e17;
+    --bg-mesh:
+      radial-gradient(circle at 0% 0%, rgba(220, 38, 80, 0.34), transparent 50%),
+      radial-gradient(circle at 100% 10%, rgba(59, 100, 230, 0.3), transparent 52%),
+      radial-gradient(circle at 85% 100%, rgba(140, 70, 220, 0.26), transparent 55%),
+      radial-gradient(circle at 5% 95%, rgba(230, 110, 60, 0.14), transparent 50%),
+      linear-gradient(160deg, #15101b 0%, #0e1020 100%);
+    --surface: rgba(255, 255, 255, 0.07);
+    --surface-2: rgba(255, 255, 255, 0.05);
+    --surface-hover: rgba(255, 255, 255, 0.12);
+    --surface-active: rgba(255, 255, 255, 0.16);
+    --surface-solid: #1d1824;
+    --border: rgba(255, 255, 255, 0.13);
+    --border-strong: rgba(255, 255, 255, 0.22);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    --text: #f6f2f7;
+    --text-2: #cdc3cf;
+    --text-3: #9d93a2;
+    --focus: rgba(255, 90, 116, 0.5);
     --success: #4ade80;
-    --success-bg: rgba(74, 222, 128, 0.12);
+    --success-bg: rgba(74, 222, 128, 0.14);
     --warning: #fbbf24;
-    --warning-bg: rgba(251, 191, 36, 0.12);
+    --warning-bg: rgba(251, 191, 36, 0.14);
     --danger: #ff7a8e;
-    --danger-bg: rgba(255, 122, 142, 0.12);
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    --danger-bg: rgba(255, 122, 142, 0.14);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(0, 0, 0, 0.2);
+    --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --crimson: #f0435f;
-  --crimson-strong: #ff6b81;
-  --crimson-soft: rgba(240, 67, 95, 0.16);
-  --blue: #6b93f0;
-  --bg: #171412;
-  --surface: #221e1b;
-  --surface-2: #2c2723;
-  --border: #3a332e;
-  --border-strong: #4d4540;
-  --text: #f6f3f0;
-  --text-2: #c4bbb3;
-  --text-3: #948a82;
-  --focus: rgba(240, 67, 95, 0.45);
+  --crimson: #ff5a74;
+  --crimson-strong: #ff8095;
+  --crimson-soft: rgba(255, 90, 116, 0.16);
+  --blue: #7aa0ff;
+  --accent-gradient: linear-gradient(135deg, #f0435f 0%, #c81e4a 55%, #8b2a8f 100%);
+  --accent-glow: 0 6px 22px rgba(240, 67, 95, 0.4);
+  --bg: #110e17;
+  --bg-mesh:
+    radial-gradient(circle at 0% 0%, rgba(220, 38, 80, 0.34), transparent 50%),
+    radial-gradient(circle at 100% 10%, rgba(59, 100, 230, 0.3), transparent 52%),
+    radial-gradient(circle at 85% 100%, rgba(140, 70, 220, 0.26), transparent 55%),
+    radial-gradient(circle at 5% 95%, rgba(230, 110, 60, 0.14), transparent 50%),
+    linear-gradient(160deg, #15101b 0%, #0e1020 100%);
+  --surface: rgba(255, 255, 255, 0.07);
+  --surface-2: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.12);
+  --surface-active: rgba(255, 255, 255, 0.16);
+  --surface-solid: #1d1824;
+  --border: rgba(255, 255, 255, 0.13);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --text: #f6f2f7;
+  --text-2: #cdc3cf;
+  --text-3: #9d93a2;
+  --focus: rgba(255, 90, 116, 0.5);
   --success: #4ade80;
-  --success-bg: rgba(74, 222, 128, 0.12);
+  --success-bg: rgba(74, 222, 128, 0.14);
   --warning: #fbbf24;
-  --warning-bg: rgba(251, 191, 36, 0.12);
+  --warning-bg: rgba(251, 191, 36, 0.14);
   --danger: #ff7a8e;
-  --danger-bg: rgba(255, 122, 142, 0.12);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  --danger-bg: rgba(255, 122, 142, 0.14);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 10px rgba(0, 0, 0, 0.2);
+  --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
 
@@ -92,9 +133,16 @@
   box-sizing: border-box;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   margin: 0;
-  background: var(--bg);
+  min-height: 100vh;
+  background: var(--bg-mesh);
+  background-color: var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
@@ -108,9 +156,25 @@ textarea {
   color: inherit;
 }
 
+/* Native dropdown lists can't be translucent; give them a solid themed background. */
+option,
+optgroup {
+  background-color: var(--surface-solid);
+  color: var(--text);
+}
+
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* Frosted panel used by cards, tabs and controls. */
+.glass {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-highlight), var(--shadow-sm);
 }
 
 kbd {
@@ -119,8 +183,8 @@ kbd {
   padding: 1px 6px;
   border: 1px solid var(--border-strong);
   border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--surface);
+  border-radius: 5px;
+  background: var(--surface-hover);
   color: var(--text);
   white-space: nowrap;
 }
@@ -141,5 +205,14 @@ kbd {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Users who ask the OS for less transparency get solid panels. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --surface: var(--surface-solid);
+    --surface-2: var(--surface-solid);
+    --glass-blur: none;
   }
 }

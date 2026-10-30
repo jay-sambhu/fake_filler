@@ -4,22 +4,17 @@ import {
   classifyUnknownField,
   normalizeFieldType,
   sanitizePayload,
-  testGeminiConnection,
   NEPALI_ADMINISTRATIVE_TOKENS,
-  SUPPORTED_GEMINI_MODELS,
-  DEFAULT_GEMINI_MODEL,
-  FALLBACK_GEMINI_MODEL,
-  resolveGeminiModel,
-} from '../src/services/geminiClassifier';
+} from '../src/services/aiClassifier';
 import {
   clearClassificationCache,
   computeFieldHash,
   getCachedClassification,
   saveCachedClassification,
 } from '../src/services/classificationCache';
-import { FieldClassificationPayload, GeminiConfig } from '../src/types';
+import { AiConfig, FieldClassificationPayload } from '../src/types';
 
-describe('Gemini Unknown Field Classifier & Caching Engine', () => {
+describe('AI Unknown Field Classifier & Caching Engine', () => {
   beforeEach(async () => {
     await clearClassificationCache();
   });
@@ -97,14 +92,16 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
   });
 
   describe('Offline Boundaries & Cache Lookup', () => {
-    it('returns unknown immediately with 0 network calls when Gemini is disabled or unkeyed', async () => {
+    it('returns unknown immediately with 0 network calls when AI is disabled or unkeyed', async () => {
       let networkCalled = false;
       const mockFetch: typeof fetch = async () => {
         networkCalled = true;
         return {} as any;
       };
 
-      const config: GeminiConfig = {
+      const config: AiConfig = {
+        provider: 'gemini',
+        model: 'test-model',
         apiKey: '',
         enabled: false,
       };
@@ -140,7 +137,9 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
         return {} as any;
       };
 
-      const config: GeminiConfig = {
+      const config: AiConfig = {
+        provider: 'gemini',
+        model: 'test-model',
         apiKey: 'fake-api-key',
         enabled: true,
       };
@@ -186,7 +185,9 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
           json: async () => fakeResponse,
         } as any);
 
-      const config: GeminiConfig = {
+      const config: AiConfig = {
+        provider: 'gemini',
+        model: 'test-model',
         apiKey: 'test-key-12345',
         enabled: true,
       };
@@ -211,7 +212,9 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
         throw new Error('Network offline or ECONNREFUSED');
       };
 
-      const config: GeminiConfig = {
+      const config: AiConfig = {
+        provider: 'gemini',
+        model: 'test-model',
         apiKey: 'test-key-12345',
         enabled: true,
       };
@@ -219,173 +222,7 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
       const result = await classifyUnknownField(payload, config, failingFetch);
       expect(result.fieldType).toBe('unknown');
       expect(result.confidence).toBe(0);
-      expect(result.reasoning).toContain('Network or fetch exception');
-    });
-  });
-
-  describe('Phase 3.1 — Gemini Test Connection & Instant Validation', () => {
-    it('fails fast if API key is empty or whitespace without calling fetch', async () => {
-      let fetchCalled = false;
-      const mockFetch: typeof fetch = async () => {
-        fetchCalled = true;
-        return {} as any;
-      };
-
-      const result = await testGeminiConnection('   ', 'gemini-3.5-flash-lite', mockFetch);
-      expect(fetchCalled).toBe(false);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('invalid_key');
-      expect(result.message).toContain('API key is missing');
-    });
-
-    it('verifies valid connection with latency when API returns 200 OK', async () => {
-      let requestedUrl = '';
-      let requestBody: any = null;
-
-      let requestHeaders: Record<string, string> = {};
-      const mockFetch: typeof fetch = async (url, init) => {
-        requestedUrl = String(url);
-        requestHeaders = (init?.headers || {}) as Record<string, string>;
-        requestBody = JSON.parse(String(init?.body || '{}'));
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            candidates: [
-              {
-                content: {
-                  parts: [{ text: 'pong' }],
-                },
-              },
-            ],
-          }),
-        } as any;
-      };
-
-      const result = await testGeminiConnection('valid-test-key-123', 'gemini-3.5-flash-lite', mockFetch);
-      expect(requestedUrl).toContain('models/gemini-3.5-flash-lite:generateContent');
-      // The key travels in a header, never in the URL (URLs end up in logs and history)
-      expect(requestedUrl).not.toContain('valid-test-key-123');
-      expect(requestHeaders['x-goog-api-key']).toBe('valid-test-key-123');
-      expect(requestBody.contents[0].parts[0].text).toBe('ping');
-      expect(result.success).toBe(true);
-      expect(result.status).toBe('valid');
-      expect(result.message).toContain('Connection verified');
-      expect(typeof result.latencyMs).toBe('number');
-      expect(result.model).toBe('gemini-3.5-flash-lite');
-    });
-
-    it('handles HTTP 400 with invalid API key response', async () => {
-      const mockFetch: typeof fetch = async () =>
-        ({
-          ok: false,
-          status: 400,
-          json: async () => ({
-            error: {
-              code: 400,
-              message: 'API key not valid. Please pass a valid API key.',
-              status: 'INVALID_ARGUMENT',
-            },
-          }),
-        } as any);
-
-      const result = await testGeminiConnection('bad-key', 'gemini-3.5-flash-lite', mockFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('invalid_key');
-      expect(result.message).toContain('Invalid API key');
-      expect(result.message).toContain('API key not valid');
-    });
-
-    it('handles HTTP 403 permission denied', async () => {
-      const mockFetch: typeof fetch = async () =>
-        ({
-          ok: false,
-          status: 403,
-          json: async () => ({
-            error: {
-              code: 403,
-              message: 'Method doesn\'t allow unregistered callers.',
-              status: 'PERMISSION_DENIED',
-            },
-          }),
-        } as any);
-
-      const result = await testGeminiConnection('unauthorized-key', 'gemini-3.5-flash-lite', mockFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('invalid_key');
-      expect(result.message).toContain('Invalid API key');
-    });
-
-    it('handles HTTP 429 quota exhaustion with specific quota message', async () => {
-      const mockFetch: typeof fetch = async () =>
-        ({
-          ok: false,
-          status: 429,
-          json: async () => ({
-            error: {
-              code: 429,
-              message: 'Resource has been exhausted (e.g. check quota).',
-              status: 'RESOURCE_EXHAUSTED',
-            },
-          }),
-        } as any);
-
-      const result = await testGeminiConnection('exhausted-key', 'gemini-3.5-flash-lite', mockFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('quota_exhausted');
-      expect(result.message).toContain('Quota exceeded (HTTP 429)');
-      expect(result.message).toContain('Resource has been exhausted');
-    });
-
-    it('handles HTTP 404 when model is unavailable or misspelled', async () => {
-      const mockFetch: typeof fetch = async () =>
-        ({
-          ok: false,
-          status: 404,
-          json: async () => ({
-            error: {
-              code: 404,
-              message: 'models/non-existent-model is not found.',
-              status: 'NOT_FOUND',
-            },
-          }),
-        } as any);
-
-      const result = await testGeminiConnection('some-key', 'non-existent-model', mockFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('model_not_found');
-      expect(result.message).toContain("Model 'non-existent-model' was not found");
-    });
-
-    it('handles general unexpected HTTP errors like 500 server error', async () => {
-      const mockFetch: typeof fetch = async () =>
-        ({
-          ok: false,
-          status: 500,
-          statusText: 'Internal Server Error',
-          json: async () => ({
-            error: {
-              code: 500,
-              message: 'Internal server error occurred.',
-            },
-          }),
-        } as any);
-
-      const result = await testGeminiConnection('valid-key', 'gemini-3.5-flash-lite', mockFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('error');
-      expect(result.message).toContain('Gemini API error (HTTP 500)');
-    });
-
-    it('handles offline network exceptions gracefully', async () => {
-      const failingFetch: typeof fetch = async () => {
-        throw new TypeError('Failed to fetch: DNS resolution failed');
-      };
-
-      const result = await testGeminiConnection('valid-key', 'gemini-3.5-flash-lite', failingFetch);
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('network_error');
-      expect(result.message).toContain('Network error: Unable to connect to Gemini API');
+      expect(result.reasoning).toContain('Could not reach Google Gemini');
     });
   });
 
@@ -498,7 +335,9 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
         } as any;
       };
 
-      const config: GeminiConfig = {
+      const config: AiConfig = {
+        provider: 'gemini',
+        model: 'test-model',
         apiKey: 'test-admin-key',
         enabled: true,
       };
@@ -510,121 +349,6 @@ describe('Gemini Unknown Field Classifier & Caching Engine', () => {
       expect(result.fieldType).toBe('fullName');
       expect(result.confidence).toBe(0.95);
       expect(result.reasoning).toContain('bujhaune');
-    });
-  });
-
-  describe('Phase 3.3 — Dynamic Model Selector & Fallback Engine', () => {
-    it('defines supported model options with required models and fallback metadata', () => {
-      const modelIds = SUPPORTED_GEMINI_MODELS.map((m) => m.id);
-      expect(modelIds).toEqual(['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
-      // Retired models must not be offered
-      expect(modelIds).not.toContain('gemini-1.5-flash');
-
-      expect(DEFAULT_GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
-      expect(FALLBACK_GEMINI_MODEL).toBe('gemini-3.5-flash-lite');
-    });
-
-    it('resolves valid models accurately with trimming and case insensitivity', () => {
-      expect(resolveGeminiModel('gemini-3.8-flash')).toBe('gemini-3.8-flash');
-      expect(resolveGeminiModel('gemini-3.5-flash-lite')).toBe('gemini-3.5-flash-lite');
-      expect(resolveGeminiModel('  GEMINI-3.8-FLASH  ')).toBe('gemini-3.8-flash');
-      // Models stored by older versions resolve to the default
-      expect(resolveGeminiModel('gemini-1.5-flash')).toBe('gemini-3.5-flash-lite');
-      expect(resolveGeminiModel('gemini-2.5-pro')).toBe('gemini-3.5-flash-lite');
-    });
-
-    it('falls back to gemini-3.5-flash-lite on unknown, empty, or undefined models', () => {
-      expect(resolveGeminiModel(undefined)).toBe('gemini-3.5-flash-lite');
-      expect(resolveGeminiModel('')).toBe('gemini-3.5-flash-lite');
-      expect(resolveGeminiModel('   ')).toBe('gemini-3.5-flash-lite');
-      expect(resolveGeminiModel('non-existent-gpt-model')).toBe('gemini-3.5-flash-lite');
-    });
-
-    it('automatically retries with gemini-3.5-flash-lite if selected model returns 404', async () => {
-      const payload: FieldClassificationPayload = {
-        domain: 'gov.np',
-        name: 'chalani_karyalaya',
-      };
-
-      const requestedUrls: string[] = [];
-
-      const mockFetch: typeof fetch = async (url) => {
-        const urlStr = String(url);
-        requestedUrls.push(urlStr);
-
-        // First attempt with gemini-3.8-flash fails with 404
-        if (urlStr.includes('gemini-3.8-flash')) {
-          return {
-            ok: false,
-            status: 404,
-            json: async () => ({ error: { code: 404, message: 'Model not found' } }),
-          } as any;
-        }
-
-        // Fallback attempt with gemini-3.5-flash-lite succeeds with 200
-        if (urlStr.includes('gemini-3.5-flash-lite')) {
-          return {
-            ok: true,
-            status: 200,
-            json: async () => ({
-              candidates: [
-                {
-                  content: {
-                    parts: [
-                      {
-                        text: JSON.stringify({
-                          fieldType: 'referenceNumber',
-                          confidence: 0.9,
-                          reasoning: 'Classified using fallback model',
-                        }),
-                      },
-                    ],
-                  },
-                },
-              ],
-            }),
-          } as any;
-        }
-
-        return { ok: false, status: 500 } as any;
-      };
-
-      const config: GeminiConfig = {
-        apiKey: 'test-key',
-        enabled: true,
-        model: 'gemini-3.8-flash',
-      };
-
-      const result = await classifyUnknownField(payload, config, mockFetch);
-      expect(requestedUrls.length).toBe(2);
-      expect(requestedUrls[0]).toContain('gemini-3.8-flash');
-      expect(requestedUrls[1]).toContain('gemini-3.5-flash-lite');
-      expect(result.fieldType).toBe('referenceNumber');
-      expect(result.confidence).toBe(0.9);
-    });
-
-    it('testGeminiConnection reports a missing model clearly', async () => {
-      let testedUrl = '';
-      const mockFetch: typeof fetch = async (url) => {
-        testedUrl = String(url);
-        return {
-          ok: false,
-          status: 404,
-          json: async () => ({
-            error: {
-              code: 404,
-              message: 'Model gemini-3.8-flash not found in region',
-              status: 'NOT_FOUND',
-            },
-          }),
-        } as any;
-      };
-
-      const result = await testGeminiConnection('test-key-xyz', 'gemini-3.8-flash', mockFetch);
-      expect(testedUrl).toContain('models/gemini-3.8-flash:generateContent');
-      expect(result.success).toBe(false);
-      expect(result.status).toBe('model_not_found');
-      expect(result.message).toContain('gemini-3.8-flash');
     });
   });
 });
