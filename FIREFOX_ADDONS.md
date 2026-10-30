@@ -129,7 +129,7 @@ nepal, form filler, test data, fake data, devtools, qa testing, bikram sambat, c
 
 #### Privacy Policy URL
 ```text
-https://github.com/jay-sambhu/Chrome-extension/blob/main/PRIVACY.md
+https://github.com/jay-sambhu/fake_filler/blob/main/PRIVACY.md
 ```
 
 #### Support Email
@@ -139,7 +139,7 @@ dellizulter@gmail.com
 
 #### Support Website / Repository (Optional)
 ```text
-https://github.com/jay-sambhu/Chrome-extension
+https://github.com/jay-sambhu/fake_filler
 ```
 
 ---

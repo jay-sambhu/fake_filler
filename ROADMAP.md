@@ -9,7 +9,7 @@ Tick items off as they are done. Each item says why it matters, so it's clear wh
 ## 0. Before submitting (by 13 October)
 
 - [x] **Commit and tag** the current work as `v1.0.0`.
-- [x] **Privacy policy:** published at https://github.com/jay-sambhu/Chrome-extension/blob/main/PRIVACY.md (contact: dellizulter@gmail.com).
+- [x] **Privacy policy:** published at https://github.com/jay-sambhu/fake_filler/blob/main/PRIVACY.md (contact: dellizulter@gmail.com).
 - [x] **Driving licence Category K = `ट`:** confirmed by the transport office question bank ("वर्ग ट/K (स्कुटर/मोपेड)").
 - [ ] **Test by hand on real forms** with `dist/` loaded unpacked:
   - [ ] Lok Sewa online application (psconline.psc.gov.np). Not reachable from the test machine on 14 Oct (connection timed out); try from another network after logging in

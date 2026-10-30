@@ -165,7 +165,7 @@ Everything needed to submit **${firefoxManifest.name}** to Mozilla Add-ons (AMO)
 * **Description:**
   (Copy full description from CHROMEWEBSTORE.md)
 * **Privacy Policy URL:**
-  \`https://github.com/jay-sambhu/Chrome-extension/blob/main/PRIVACY.md\`
+  \`https://github.com/jay-sambhu/fake_filler/blob/main/PRIVACY.md\`
 * **Support Email:**
   \`dellizulter@gmail.com\`
 

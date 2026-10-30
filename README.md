@@ -12,7 +12,8 @@ npm run dev        # Vite dev server with extension HMR; load dist/ unpacked in 
 npm test           # Vitest (jsdom)
 npm run typecheck
 npm run build      # production build into dist/
-npm run package    # fresh build + zip for the Chrome Web Store
+npm run package          # fresh build + zip for the Chrome Web Store
+npm run package:firefox  # fresh build + source zip for Mozilla Firefox Add-ons (AMO)
 ```
 
 `demo/index.html` is a test bench with Loksewa, banking, university, employment, multi-step and custom-control forms. Open it with the extension loaded to try changes.
@@ -32,4 +33,4 @@ Messages from the popup or background go to every frame of the tab. Each frame f
 
 ## Releasing
 
-Bump `version` in `package.json` (the manifest reads it), run `npm test`, then `npm run package`. Store listing text, permission justifications and privacy answers are in [CHROMEWEBSTORE.md](CHROMEWEBSTORE.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
+Bump `version` in `package.json` (the manifest reads it), run `npm test`, then `npm run package` (Chrome) or `npm run package:firefox` (Firefox). Store listing text, permission justifications and privacy answers are in [CHROMEWEBSTORE.md](CHROMEWEBSTORE.md) and [FIREFOX_ADDONS.md](FIREFOX_ADDONS.md). The privacy policy is [PRIVACY.md](PRIVACY.md).
