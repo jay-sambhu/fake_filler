@@ -7,6 +7,12 @@ export default defineManifest(() => ({
   version: pkg.version,
   description: 'Fill web forms with realistic, synthetic Nepali test data: names, addresses, phone numbers, citizenship IDs and BS dates.',
   minimum_chrome_version: '116',
+  browser_specific_settings: {
+    gecko: {
+      id: 'nepal-test-filler@aashishpokhrel.info.np',
+      strict_min_version: '109.0',
+    },
+  },
   icons: {
     '16': 'icons/icon-16.png',
     '32': 'icons/icon-32.png',
