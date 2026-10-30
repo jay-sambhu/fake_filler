@@ -1,7 +1,7 @@
 {
   "name": "nepal-test-filler",
   "version": "1.0.0",
-  "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Chrome extension that fills web forms with realistic synthetic Nepali test data",
   "scripts": {
