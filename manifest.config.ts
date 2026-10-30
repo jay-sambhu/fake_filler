@@ -10,7 +10,10 @@ export default defineManifest(() => ({
   browser_specific_settings: {
     gecko: {
       id: 'nepal-test-filler@aashishpokhrel.info.np',
-      strict_min_version: '109.0',
+      strict_min_version: '121.0',
+      data_collection_permissions: {
+        required: ['none'],
+      },
     },
   },
   icons: {

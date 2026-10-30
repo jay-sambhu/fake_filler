@@ -10,6 +10,7 @@ const rootDir = path.resolve(__dirname, '..');
 const distDir = path.resolve(rootDir, 'dist');
 const pkgPath = path.resolve(rootDir, 'package.json');
 const firefoxUploadDir = path.resolve(rootDir, 'firefox-upload');
+const firefoxStagingDir = path.resolve(rootDir, '.firefox-staging');
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 const version = pkg.version;
@@ -20,39 +21,72 @@ console.log(`🦊 Packaging ${name} v${version} for Mozilla Firefox Add-ons (AMO
 // 1. Build extension fresh
 execSync('npm run build', { cwd: rootDir, stdio: 'inherit' });
 
-// 2. Validate manifest has gecko ID
+// 2. Validate manifest exists in dist
 const manifestPath = path.resolve(distDir, 'manifest.json');
 if (!fs.existsSync(manifestPath)) {
   console.error('❌ dist/manifest.json not found!');
   process.exit(1);
 }
-const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-if (!manifest.browser_specific_settings?.gecko?.id) {
-  console.error('❌ manifest.json is missing browser_specific_settings.gecko.id for Firefox!');
-  process.exit(1);
-}
 
-// 3. Ensure target directory exists
+// 3. Ensure target directory exists and is clean
 if (fs.existsSync(firefoxUploadDir)) {
   fs.rmSync(firefoxUploadDir, { recursive: true, force: true });
 }
 fs.mkdirSync(firefoxUploadDir, { recursive: true });
 
-// 4. Create Extension Binary ZIP (nepal-test-filler-firefox-vX.X.X.zip)
+if (fs.existsSync(firefoxStagingDir)) {
+  fs.rmSync(firefoxStagingDir, { recursive: true, force: true });
+}
+
+// 4. Create Firefox-specific staging folder with compliant manifest
+fs.cpSync(distDir, firefoxStagingDir, { recursive: true });
+
+const firefoxManifestPath = path.resolve(firefoxStagingDir, 'manifest.json');
+const firefoxManifest = JSON.parse(fs.readFileSync(firefoxManifestPath, 'utf-8'));
+
+// Firefox MV3 requires background.scripts (not standalone background.service_worker)
+const backgroundWorker = firefoxManifest.background?.service_worker || 'service-worker-loader.js';
+firefoxManifest.background = {
+  scripts: [backgroundWorker],
+  type: 'module'
+};
+
+// Ensure Firefox Gecko ID, strict_min_version >= 121.0, and data_collection_permissions
+firefoxManifest.browser_specific_settings = {
+  gecko: {
+    id: firefoxManifest.browser_specific_settings?.gecko?.id || 'nepal-test-filler@aashishpokhrel.info.np',
+    strict_min_version: '121.0',
+    data_collection_permissions: {
+      required: ['none']
+    }
+  }
+};
+
+// Remove Chrome-specific fields that trigger AMO warnings
+delete firefoxManifest.minimum_chrome_version;
+
+fs.writeFileSync(firefoxManifestPath, JSON.stringify(firefoxManifest, null, 2), 'utf-8');
+
+// 5. Create Extension Binary ZIP for AMO upload
 const addonZipName = `${name}-v${version}-firefox.zip`;
 const addonZipPath = path.resolve(firefoxUploadDir, addonZipName);
 
 try {
   execSync(`zip -r -9 -X "${addonZipPath}" . -x "*.map" -x ".DS_Store"`, {
-    cwd: distDir,
+    cwd: firefoxStagingDir,
     stdio: 'pipe'
   });
 } catch (err) {
   console.error('❌ Failed to create Firefox addon zip:', err);
   process.exit(1);
+} finally {
+  // Clean up staging directory
+  if (fs.existsSync(firefoxStagingDir)) {
+    fs.rmSync(firefoxStagingDir, { recursive: true, force: true });
+  }
 }
 
-// 5. Create Source Code ZIP (nepal-test-filler-source-vX.X.X.zip) required by AMO
+// 6. Create Source Code ZIP (nepal-test-filler-source-vX.X.X.zip) required by AMO
 const sourceZipName = `${name}-v${version}-source.zip`;
 const sourceZipPath = path.resolve(firefoxUploadDir, sourceZipName);
 
@@ -69,11 +103,11 @@ try {
   });
 }
 
-// 6. Write BUILD_INSTRUCTIONS.txt for AMO reviewers
+// 7. Write BUILD_INSTRUCTIONS.txt for AMO reviewers
 const buildInstructions = `BUILD INSTRUCTIONS FOR MOZILLA ADD-ONS (AMO) REVIEWERS
-Project: ${manifest.name}
+Project: ${firefoxManifest.name}
 Version: v${version}
-Gecko ID: ${manifest.browser_specific_settings.gecko.id}
+Gecko ID: ${firefoxManifest.browser_specific_settings.gecko.id}
 
 Prerequisites:
 - Node.js version 18 or newer
@@ -84,13 +118,13 @@ Steps to build the add-on from source:
 2. In the project root, install dependencies:
    npm install
 3. Build the production extension:
-   npm run build
-4. The output add-on files will be generated in the 'dist' folder.
-   The contents of 'dist/' match the submitted extension archive exactly.
+   npm run package:firefox
+4. The output add-on files are placed in 'firefox-upload/':
+   The package '${addonZipName}' matches the submitted extension archive exactly.
 `;
 fs.writeFileSync(path.resolve(firefoxUploadDir, 'BUILD_INSTRUCTIONS.txt'), buildInstructions, 'utf-8');
 
-// 7. Copy store assets (icons and screenshots)
+// 8. Copy store assets (icons and screenshots)
 const assetsDir = path.resolve(firefoxUploadDir, 'assets');
 fs.mkdirSync(assetsDir, { recursive: true });
 
@@ -106,10 +140,10 @@ if (fs.existsSync(iconSrc)) {
   fs.copyFileSync(iconSrc, path.resolve(assetsDir, 'icon-128.png'));
 }
 
-// 8. Write AMO_SUBMISSION_GUIDE.md
+// 9. Write AMO_SUBMISSION_GUIDE.md
 const submissionGuide = `# Mozilla Firefox Add-ons (AMO) Submission Guide
 
-Everything needed to submit **${manifest.name}** to Mozilla Add-ons (AMO) is in this folder (\`firefox-upload/\`).
+Everything needed to submit **${firefoxManifest.name}** to Mozilla Add-ons (AMO) is in this folder (\`firefox-upload/\`).
 
 ## 1. Files to Upload
 
@@ -123,8 +157,8 @@ Everything needed to submit **${manifest.name}** to Mozilla Add-ons (AMO) is in 
 
 ## 2. Listing Information (Copy & Paste)
 
-* **Name:** \`${manifest.name}\`
-* **Gecko ID:** \`${manifest.browser_specific_settings.gecko.id}\`
+* **Name:** \`${firefoxManifest.name}\`
+* **Gecko ID:** \`${firefoxManifest.browser_specific_settings.gecko.id}\`
 * **Summary (max 250 chars):**
   > Fill web forms with realistic, synthetic Nepali test data: names, addresses, phone numbers, citizenship IDs and BS dates.
 * **Categories:** Developer Tools
